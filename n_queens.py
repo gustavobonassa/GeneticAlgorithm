@@ -2,6 +2,7 @@ import configparser
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import random
 
 parser = configparser.ConfigParser()
 parser.read("n_queens.cfg")
@@ -107,8 +108,36 @@ def crossover(population, pc):
 
     return population
 
+def stochastic_tournament(population: np.ndarray, k: int = 2, kp: int = 1) -> np.array:
+    def fight(subpop):
+        lucky_number = random.random()
+        if kp >= lucky_number:
+            return subpop[1][0]
+        return subpop[0][0]
+
+    weights = [1 for i in population]
+    return np.array(
+        [
+            fight(
+                sorted(
+                    random.choices(population, k=k, weights=weights), key=lambda x: x[1]
+                )[0 :: k - 1]
+            )
+            for i in population
+        ]
+    )
+
+def swap(chromosome):
+    point_1 = np.random.randint(len(chromosome))
+    point_2 = np.random.randint(len(chromosome))
+    while point_1 == point_2:
+        point_2 = np.random.randint(len(chromosome))
+    chromosome[point_1], chromosome[point_2] = chromosome[point_2], chromosome[point_1]
+
+    return chromosome
+
 def select(population):
-    return population
+    return stochastic_tournament(population)
 
 if __name__ == "__main__":
     gen = int(parser.get("config", "GEN"))
@@ -125,16 +154,16 @@ if __name__ == "__main__":
         selected = select(pop)
         pop = crossover(selected, pc)
 
-        if el:
-            newElite = elitismo(pop)
-            if (newElite[1] >= elite[1]):
-                elite = newElite
-                # bestAllElite.append(newElite[1])
-            best.append(newElite[1])
+        # if el:
+        #     newElite = elitismo(pop)
+        #     if (newElite[1] >= elite[1]):
+        #         elite = newElite
+        #         # bestAllElite.append(newElite[1])
+        #     best.append(newElite[1])
 
-            if (elite[1] > 0):
-                pop.pop()
-                pop.append(elite)
+        #     if (elite[1] > 0):
+        #         pop.pop()
+        #         pop.append(elite)
                 
 
     result = [i[1] for i in pop]
