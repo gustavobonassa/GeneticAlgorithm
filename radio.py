@@ -6,7 +6,7 @@ import random
 from functools import reduce
 
 parser = configparser.ConfigParser()
-parser.read("n_queens.cfg")
+parser.read("radio.cfg")
 
 def binaryRandom(size):
     return np.random.randint(0, 2, size, dtype="uint8")
@@ -76,18 +76,32 @@ def getPopulation():
         pop.append(result)
     return pop
 
-def fitness(individuo):
-    # print(individuo)
-    dim = len(individuo)
-    max_fit = dim * (dim - 1)
-    fit = max_fit
-    for i in range(len(individuo) - 1):
-        for j in range(i + 1, len(individuo)):
-            distanceY = abs(individuo[i] - individuo[j])
-            distanceX = abs(i - j)
-            fit -= 2 * (distanceY == distanceX)
-    return (individuo, fit / max_fit)
+def binaryToInt(individual):
+    out = 0
+    for bit in individual:
+        out = (out << 1) | bit
 
+    return out
+
+def normalization(ind):
+    xrl = binaryToInt(ind[: len(ind) // 2])
+    xrs = binaryToInt(ind[len(ind) // 2 :])
+    # rs [0-24] -> 5 bits
+    # rl [0-16] -> 5 bits
+    rl = math.floor(0 + (16 / 31) * xrl)
+    rs = math.floor(0 + (24 / 31) * xrs)
+
+    return rl, rs
+
+def fitness(ind):
+    rl, rs = normalization(ind)
+
+    r = -1
+    FOn = (30 * rs + 40 * rl) / 1360
+    Hn = max(0, (rs + 2 * rl - 40)) / 16
+    fit = FOn + r * Hn
+
+    return ind, fit
 
 def plotChart(result, media):
     plt.plot(result, label="Melhor")
@@ -106,7 +120,7 @@ def crossover(population, pc):
     change = np.random.rand(len(population))
     for i in range(0, len(change) - 1, 2):
         if change[i] <= pc:
-            population[i], population[i + 1] = pmx(
+            population[i], population[i + 1] = two_points(
                 population[i], population[i + 1]
             )
 
@@ -165,14 +179,58 @@ def swap(chromosome):
 
     return chromosome
 
+def bit_flip(chromosome):
+    choose = np.random.rand(len(chromosome))
+
+    for i in range(len(choose)):
+        if choose[i] < 0.5:
+            chromosome[i] = 1 if chromosome[i] == 0 else 0
+
+    return chromosome
+
+
 def select(population):
-    return stochastic_tournament(population)
+    return fitness_proportionate_selection(population)
+
+def one_point(
+    parent_1, parent_2, index = -1
+):
+    if index == -1:
+        index = int(np.random.uniform(low=1, high=len(parent_1) - 1))
+    return np.array(
+        [
+            np.hstack([parent_1[:index], parent_2[index:]]),
+            np.hstack([parent_2[:index], parent_1[index:]]),
+        ]
+    )
+
+
+def two_points(parent_1, parent_2):
+    crom_size = len(parent_1) - 1
+
+    index_1 = int(np.random.uniform(low=1, high=crom_size - 2))
+    index_2 = int(np.random.uniform(low=index_1, high=crom_size))
+
+    child_1, child_2 = one_point(parent_1, parent_2, index_1)
+
+    return one_point(child_1, child_2, index_2)
+
+
+def uniform(parent_1, parent_2):
+    choose = np.random.rand(len(parent_1))
+
+    for i in range(len(choose)):
+        if choose[i] < 0.5:
+            temp = parent_1[i]
+            parent_1[i] = parent_2[i]
+            parent_2[i] = temp
+    return [parent_1, parent_2]
 
 def mutate(population):
     def will_mutate(individual):
         rnd = np.random.rand()
         return (
-            swap(individual)
+            bit_flip(individual)
             if rnd <= float(parser.get("config", "PM"))
             else individual
         )
