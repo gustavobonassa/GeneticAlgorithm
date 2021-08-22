@@ -6,7 +6,7 @@ import random
 from functools import reduce
 
 parser = configparser.ConfigParser()
-parser.read("n_queens.cfg")
+parser.read("n_queens_valorado.cfg")
 
 def binaryRandom(size):
     return np.random.randint(0, 2, size, dtype="uint8")
@@ -32,6 +32,31 @@ def genIndividuo(key):
         "REAL": realRandom(dim, low, high),
     }
     return generator[key]
+
+def show_table(chromosome, profit_array, max_fit_profit) -> str:
+    size = len(chromosome)
+    board = np.full((size, size), ".")
+
+    for index, item in enumerate(chromosome):
+        board[index][item - 1] = "x"
+
+    out = ""
+    for row in board:
+        out += "|"
+        for tile in row:
+            out += tile
+        out += " |\n"
+
+    col, profit = 0, 0
+    for i in range(len(chromosome) - 1):
+        profit += profit_array[(i + 1) * (chromosome[i] - 1)]
+        for j in range(i + 1, len(chromosome)):
+            col += 2 * (abs(chromosome[i] - chromosome[j]) == abs(i - j))
+
+    out += f"\ncollisions: {col}\n"
+    out += "profit: %f/%f\n" % (profit, max_fit_profit)
+
+    return out
 
 def pmx(parent1, parent2):
     size = min(len(parent1), len(parent2))
@@ -76,17 +101,18 @@ def getPopulation():
         pop.append(result)
     return pop
 
-def fitness(individuo):
-    # print(individuo)
-    dim = len(individuo)
-    max_fit = dim * (dim - 1)
-    fit = max_fit
-    for i in range(len(individuo) - 1):
-        for j in range(i + 1, len(individuo)):
-            distanceY = abs(individuo[i] - individuo[j])
-            distanceX = abs(i - j)
-            fit -= 2 * (distanceY == distanceX)
-    return (individuo, fit / max_fit)
+def fitness(individo, values, max_fit_profit):
+    dim = len(individo)
+    fit = dim * (dim - 1)
+    max_fit = fit * 0.8 + max_fit_profit * 0.2
+
+    profit: float = 0
+    for i in range(len(individo) - 1):
+        profit += values[(i + 1) * (individo[i] - 1)]
+        for j in range(i + 1, len(individo)):
+            fit -= 2 * (abs(individo[i] - individo[j]) == abs(i - j))
+
+    return individo, (fit * 0.8 + profit * 0.2) / max_fit
 
 
 def plotChart(result, media):
@@ -130,7 +156,7 @@ def stochasticTournament(population, k: int = 2, kp: int = 1):
         ]
     return newPop
 
-def fitness_proportionate_selection(population):
+def fitnessProportionateSelection(population):
     selected = []
     removed_fitness = None
     sum_fit = float(sum([c[1] for c in population]))
@@ -184,7 +210,17 @@ if __name__ == "__main__":
     run = int(parser.get("config", "RUN"))
     pc = float(parser.get("config", "PC"))
     el = bool(int(parser.get("config", "EL")))
+    dim = int(parser.get("config", "DIM"))
 
+    profit_array = np.array(list(map(float, range(1, dim ** 2 + 1))))
+    op, po = math.sqrt, math.log10
+    for i in range(len(profit_array)):
+        profit_array[i] = op(profit_array[i])
+        if not (i + 1) % dim:
+            po, op = op, po
+            continue
+
+    max_fit_profit = sum(sorted(profit_array)[-1 : -dim - 1 : -1])
     bestOfAll = []
     mediaAll = []
     bestSolution = ([], 0)
@@ -195,9 +231,10 @@ if __name__ == "__main__":
         
         pop = getPopulation()
         for j in range(gen):
-            popFit = [fitness(i) for i in pop]
+            popFit = [fitness(i, profit_array, max_fit_profit) for i in pop]
             avg = reduce(lambda a, b: a + b[1], popFit, 0) / len(popFit)
             media.append(avg)
+            # print(popFit)
 
             elite = elitismo(popFit)
             if elite[1] > bestSolution[1]:
@@ -231,4 +268,5 @@ if __name__ == "__main__":
             avv2 += r[j]
         avgAllBest.append(avv2 / len(bestOfAll))
     print("Melhor solucao: ", bestSolution)
+    # print(show_table(bestSolution[0], profit_array, max_fit_profit))
     plotChart(avgAllBest, avgAll)
