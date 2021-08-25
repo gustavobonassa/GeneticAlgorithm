@@ -33,9 +33,9 @@ def genIndividuo(key):
     }
     return generator[key]
 
-def show_table(chromosome, profit_array, max_fit_profit) -> str:
+def show_table(chromosome, profit_array, maxFitValue) -> str:
     size = len(chromosome)
-    board = np.full((size, size), ".")
+    board = np.full((size, size), "-")
 
     for index, item in enumerate(chromosome):
         board[index][item - 1] = "x"
@@ -54,7 +54,7 @@ def show_table(chromosome, profit_array, max_fit_profit) -> str:
             col += 2 * (abs(chromosome[i] - chromosome[j]) == abs(i - j))
 
     out += f"\ncollisions: {col}\n"
-    out += "profit: %f/%f\n" % (profit, max_fit_profit)
+    out += "profit: %f/%f\n" % (profit, maxFitValue)
 
     return out
 
@@ -101,18 +101,18 @@ def getPopulation():
         pop.append(result)
     return pop
 
-def fitness(individo, values, max_fit_profit):
+def fitness(individo, values, maxFitValue):
     dim = len(individo)
     fit = dim * (dim - 1)
-    max_fit = fit * 0.8 + max_fit_profit * 0.2
+    maxFit = fit * 0.5 + maxFitValue * 0.5
 
-    profit: float = 0
+    value: float = 0
     for i in range(len(individo) - 1):
-        profit += values[(i + 1) * (individo[i] - 1)]
+        value += values[(i + 1) * (individo[i] - 1)]
         for j in range(i + 1, len(individo)):
             fit -= 2 * (abs(individo[i] - individo[j]) == abs(i - j))
 
-    return individo, (fit * 0.8 + profit * 0.2) / max_fit
+    return individo, (fit * 0.5 + value * 0.5) / maxFit
 
 
 def plotChart(result, media):
@@ -212,15 +212,15 @@ if __name__ == "__main__":
     el = bool(int(parser.get("config", "EL")))
     dim = int(parser.get("config", "DIM"))
 
-    profit_array = np.array(list(map(float, range(1, dim ** 2 + 1))))
-    op, po = math.sqrt, math.log10
-    for i in range(len(profit_array)):
-        profit_array[i] = op(profit_array[i])
+    valueArray = np.array(list(map(float, range(1, dim ** 2 + 1))))
+    operacao, nextOp = math.sqrt, math.log10
+    for i in range(len(valueArray)):
+        valueArray[i] = operacao(valueArray[i])
         if not (i + 1) % dim:
-            po, op = op, po
+            nextOp, operacao = operacao, nextOp
             continue
 
-    max_fit_profit = sum(sorted(profit_array)[-1 : -dim - 1 : -1])
+    maxFitValue = sum(sorted(valueArray)[-1 : -dim - 1 : -1])
     bestOfAll = []
     mediaAll = []
     bestSolution = ([], 0)
@@ -231,7 +231,7 @@ if __name__ == "__main__":
         
         pop = getPopulation()
         for j in range(gen):
-            popFit = [fitness(i, profit_array, max_fit_profit) for i in pop]
+            popFit = [fitness(i, valueArray, maxFitValue) for i in pop]
             avg = reduce(lambda a, b: a + b[1], popFit, 0) / len(popFit)
             media.append(avg)
             # print(popFit)
@@ -268,5 +268,5 @@ if __name__ == "__main__":
             avv2 += r[j]
         avgAllBest.append(avv2 / len(bestOfAll))
     print("Melhor solucao: ", bestSolution)
-    # print(show_table(bestSolution[0], profit_array, max_fit_profit))
+    # print(show_table(bestSolution[0], profit_array, maxFitValue))
     plotChart(avgAllBest, avgAll)
